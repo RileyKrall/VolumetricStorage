@@ -14,7 +14,7 @@ use std::str::from_utf8;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver, TryRecvError};
 use crate::dataTypes::{CHUNK_SIDE_LENGTH, CHUNK_SIZE, Point};
-use crate::VolumeNetUtil::{ChannelDataContainer, ChunkChangeRegistrations, NetChunk, NetChunkRequest, NetChunkRequestList, NetDeRegisterRequest, NetDiff, NetDiffList, NetPayload, ServerContext};
+use crate::VolumeNetUtil::{AUTHORITY_ID, ChannelDataContainer, ChunkChangeRegistrations, NetChunk, NetChunkRequest, NetChunkRequestList, NetDeRegisterRequest, NetDiff, NetDiffList, NetPayload, ServerContext};
 use crate::VolumeStorage::{Operations, Storage};
 
 const HEADER_SIZE: usize = 5;
@@ -24,12 +24,13 @@ struct Config {
     pub port: u16,
 }
 
-fn handle_request(client_id: i32, has_authority: bool, request_label: &str, data: Vec<u8>, mut server_context: &mut ServerContext) {
+fn handle_request(client_id: i32, has_authority: bool, request_label: &str, data: String, mut server_context: &mut ServerContext) {
+    println!("Handling {} Request from client {}", request_label, client_id);
     match request_label {
         "diff" => {
             //Server only, perform one change, send out changes to server and clients
             if has_authority {
-                let diff: NetDiff = serde_json::from_slice(&data).unwrap();
+                let diff: NetDiff = serde_json::from_slice(&data.as_ref()).unwrap();
                 server_context.volume_storage.set_relative(diff.x,
                                                            diff.y,
                                                            diff.z,
@@ -54,7 +55,7 @@ fn handle_request(client_id: i32, has_authority: bool, request_label: &str, data
         "diffList" => {
             //Perform diff (above) for a list of diffs (still server only)
             if has_authority {
-                let diff_list: NetDiffList = serde_json::from_slice(&data).unwrap();
+                let diff_list: NetDiffList = serde_json::from_slice(&data.as_ref()).unwrap();
                 for diff in diff_list.list {
                     server_context.volume_storage.set_relative(diff.x,
                                                                diff.y,
@@ -83,7 +84,7 @@ fn handle_request(client_id: i32, has_authority: bool, request_label: &str, data
 
             //If server is requesting a chunk, make a special registration that wont be de-registered
             //unless server requests to
-            let chunk_req: NetChunkRequest = serde_json::from_slice(&data).unwrap();
+            let chunk_req: NetChunkRequest = serde_json::from_slice(data.as_ref()).unwrap();
             let chunk_data = NetChunk::from_chunk(server_context.volume_storage.get_chunk(chunk_req.x, chunk_req.y, chunk_req.z),
                                                   chunk_req.x, chunk_req.y, chunk_req.z);
             let chunk_id = server_context.volume_storage.get_chunk_id(chunk_req.x, chunk_req.y, chunk_req.z);
@@ -93,14 +94,13 @@ fn handle_request(client_id: i32, has_authority: bool, request_label: &str, data
                 client_id,
                 payload: NetPayload {
                     payload_type: String::from(request_label.clone()),
-                    data: Vec::from(serde_json::to_string(&chunk_data).unwrap())
+                    data: serde_json::to_string(&chunk_data).unwrap()
                 }
             });
         }
         "chunkRequestList" => {
             //Perform chunkRequest for a list of chunks
-            let chunk_req_list: NetChunkRequestList = serde_json::from_slice(&data).unwrap();
-            println!("Requested {} chunks", chunk_req_list.list.len());
+            let chunk_req_list: NetChunkRequestList = serde_json::from_slice(data.as_ref()).unwrap();
             for chunkReq in chunk_req_list.list {
                 let chunk_data = NetChunk::from_chunk(server_context.volume_storage.get_chunk(chunkReq.x, chunkReq.y, chunkReq.z),
                                                       chunkReq.x, chunkReq.y, chunkReq.z);
@@ -111,14 +111,14 @@ fn handle_request(client_id: i32, has_authority: bool, request_label: &str, data
                     client_id,
                     payload: NetPayload {
                         payload_type: String::from(request_label.clone()),
-                        data: Vec::from(serde_json::to_string(&chunk_data).unwrap())
+                        data: serde_json::to_string(&chunk_data).unwrap()
                     }
                 });
             }
         }
         "unregisterChunk" => {
             //unregister a client from receiving updates for a chunk.
-            let Deregister_req: NetDeRegisterRequest = serde_json::from_slice(&data).unwrap();
+            let Deregister_req: NetDeRegisterRequest = serde_json::from_slice(data.as_ref()).unwrap();
             let chunk_id = server_context.volume_storage.get_chunk_id(Deregister_req.x, Deregister_req.y, Deregister_req.z);
             server_context.change_registrations.deregister_for_chunk_changes(client_id, chunk_id);
         }
@@ -139,11 +139,10 @@ fn client_loop(mut stream: TcpStream, client_id: i32, send_channel: Sender<Chann
                     match stream.read_exact(&mut header) {
                         Ok(size) => {
                             let data_size: u32 = u32::from_be_bytes(header);
-                            println!("Recieved size from client: {}", data_size);
+                            println!("Received Request from client {} of size: {}b",  client_id, data_size);
                             let mut buffer = vec![0 as u8; data_size as usize];
                             match stream.read_exact(&mut buffer) {
                                 Ok(size) => {
-                                    //println!("{}", String::from_utf8(buffer.clone()).unwrap());
                                     let received_payload: NetPayload = serde_json::from_slice(&buffer).unwrap();
                                     send_channel.send(
                                         ChannelDataContainer {
@@ -184,19 +183,21 @@ fn client_loop(mut stream: TcpStream, client_id: i32, send_channel: Sender<Chann
 fn read_config() -> Config{
 
     return Config {
-        server_ip: Ipv4Addr::new(127, 0, 0, 1),
+        server_ip: Ipv4Addr::new(0, 0, 0, 0),
         port: 6969
     }
 }
 
 fn main() {
     //Get Config and apply settings
+    println!("Initializing Config");
     let config = read_config();
 
     let ip = config.server_ip.clone();
     let port= config.port.clone();
 
     //Initialize ServerContext
+    println!("Initializing Server Context");
     let mut server_context = ServerContext {
         change_registrations: ChunkChangeRegistrations::new(),
         volume_storage: VolumeStorage::Storage::new(),
@@ -204,6 +205,7 @@ fn main() {
     };
 
     //Generate Terrain
+    println!("Generating Level");
     for x in 0..(CHUNK_SIDE_LENGTH*2) {
         for y in 0..(CHUNK_SIDE_LENGTH*2) {
             for z in 0..(CHUNK_SIDE_LENGTH*2) {
@@ -257,7 +259,7 @@ fn main() {
         match rx.try_recv() {
             Ok(channel_data_container) => {
                 handle_request(channel_data_container.client_id,
-                               true,
+                               channel_data_container.client_id == AUTHORITY_ID,
                                &channel_data_container.payload.payload_type,
                                channel_data_container.payload.data,
                                &mut server_context)

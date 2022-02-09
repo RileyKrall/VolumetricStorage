@@ -21,7 +21,7 @@ pub struct ChannelDataContainer {
 #[derive(Deserialize, Serialize)]
 pub struct NetPayload {
     pub(crate) payload_type: String,
-    pub(crate) data: Vec<u8>
+    pub(crate) data: String
 }
 
 #[derive(Deserialize, Serialize)]

@@ -4,7 +4,10 @@
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a070d1df-5f90-4b9a-8506-bdd825fab256" name="Changes" comment="" />
+    <list default="true" id="a070d1df-5f90-4b9a-8506-bdd825fab256" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/VolumeServer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/VolumeServer.rs" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -42,6 +45,7 @@
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
     <property name="org.rust.disableDetachedFileInspectionC:/Users/Riley/IdeaProjects/FOCTVolumeDatabase/src/VolumeServer.rs" value="true" />
     <property name="org.rust.hideNoCargoProjectNotificationsC:/Users/Riley/IdeaProjects/FOCTVolumeDatabase/src/main.rs" value="true" />
+    <property name="settings.editor.selected.configurable" value="vcs.Git" />
   </component>
   <component name="RunManager" selected="Cargo.Run example">
     <configuration name="Run example" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
